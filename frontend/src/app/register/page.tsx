@@ -34,6 +34,8 @@ export default function RegisterPage() {
 
     try {
       const url = `${API_BASE_URL}/api/auth/register`;
+      console.log('Registering at:', url);
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,7 +47,18 @@ export default function RegisterPage() {
         }),
       });
 
-      const data = await response.json();
+      // Check content type
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        // Not JSON - get text error
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error('Server error: ' + (text.substring(0, 100) || 'Invalid response'));
+      }
 
       if (!response.ok) {
         throw new Error(data.detail || 'Registration failed');
@@ -55,6 +68,7 @@ export default function RegisterPage() {
       localStorage.setItem('token', data.access_token);
       window.location.href = '/dashboard';
     } catch (err: any) {
+      console.error('Registration error:', err);
       setError(err.message || 'An error occurred during registration');
     } finally {
       setIsLoading(false);
