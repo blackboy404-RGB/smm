@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/store';
+import { API_BASE_URL } from '@/lib/api';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -50,7 +51,8 @@ export default function DashboardLayout({
 
       try {
         // Fetch user data from API
-        const response = await fetch('/api/auth/me', {
+        const url = `${API_BASE_URL}/api/auth/me`;
+        const response = await fetch(url, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

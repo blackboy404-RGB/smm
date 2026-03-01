@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -32,7 +33,8 @@ export default function RegisterPage() {
     }
 
     try {
-      const response = await fetch('/api/auth/register', {
+      const url = `${API_BASE_URL}/api/auth/register`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
