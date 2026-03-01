@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { User, Save, Bell, Shield, Palette, Trash2 } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 const industries = [
   'Technology',
@@ -41,7 +42,8 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await fetch('/api/brand', {
+      const url = `${API_BASE_URL}/api/brand`;
+      await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(brandProfile),

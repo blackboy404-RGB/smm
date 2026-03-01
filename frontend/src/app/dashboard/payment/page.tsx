@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CreditCard, Check, Sparkles, Loader2, Phone } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 const plans = [
   {
@@ -10,7 +11,7 @@ const plans = [
     price: 0,
     description: 'Perfect for getting started',
     features: [
-      '10 AI-generated posts/month',
+      '5 AI-generated posts/month',
       'Basic content calendar',
       'Brand voice setup',
       'Email support'
@@ -60,7 +61,8 @@ export default function PaymentPage() {
     setPaymentStatus('processing');
 
     try {
-      const response = await fetch('/api/payments/stk-push', {
+      const url = `${API_BASE_URL}/api/payments/stk-push`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

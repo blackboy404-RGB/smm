@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build",
-    "start": "cd frontend && npm run start",
-    "backend": "python backend/main.py"
+    "frontend:build": "cd frontend && npm run build",
+    "frontend:start": "cd frontend && npm run start",
+    "backend": "cd backend && python main.py",
+    "start": "cd backend && python main.py"
   }
 }

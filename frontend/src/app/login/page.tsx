@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -17,7 +18,8 @@ export default function LoginPage() {
     setError('');
     
     try {
-      const response = await fetch('/api/auth/login', {
+      const url = `${API_BASE_URL}/api/auth/login`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

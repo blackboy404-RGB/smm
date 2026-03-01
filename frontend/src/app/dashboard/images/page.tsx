@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Image as ImageIcon, Sparkles, Download, Loader2, Palette } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 const stylePresets = [
   { id: 'modern', name: 'Modern', color: 'from-blue-500 to-purple-500' },
@@ -25,7 +26,8 @@ export default function ImagesPage() {
     setGeneratedImages([]);
 
     try {
-      const response = await fetch('/api/images/generate', {
+      const url = `${API_BASE_URL}/api/images/generate`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

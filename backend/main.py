@@ -15,6 +15,7 @@ import random
 import os
 import hashlib
 from dotenv import load_dotenv
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # Load environment variables from backend/.env
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -157,7 +158,15 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-async def get_current_user(token: str):
+# Security - Bearer token
+security = HTTPBearer(auto_error=False)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+    
+    token = credentials.credentials
+    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -283,7 +292,7 @@ async def login(user: UserLogin):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/api/auth/me")
-async def get_me(current_user = Depends(lambda: get_current_user)):
+async def get_me(current_user: dict = Depends(get_current_user)):
     return {
         "id": current_user["id"],
         "name": current_user["name"],
@@ -293,7 +302,7 @@ async def get_me(current_user = Depends(lambda: get_current_user)):
 
 # Brand endpoints
 @app.post("/api/brand")
-async def create_brand(brand: BrandProfile, current_user = Depends(lambda: get_current_user)):
+async def create_brand(brand: BrandProfile, current_user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     
@@ -334,7 +343,7 @@ async def create_brand(brand: BrandProfile, current_user = Depends(lambda: get_c
     return {"success": True, "message": "Brand profile saved"}
 
 @app.get("/api/brand")
-async def get_brand(current_user = Depends(lambda: get_current_user)):
+async def get_brand(current_user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     
@@ -348,7 +357,7 @@ async def get_brand(current_user = Depends(lambda: get_current_user)):
 
 # Content endpoints
 @app.post("/api/content/generate")
-async def generate_content(content: ContentGenerate, current_user = Depends(lambda: get_current_user)):
+async def generate_content(content: ContentGenerate, current_user: dict = Depends(get_current_user)):
     # Get templates
     platform_templates = CONTENT_TEMPLATES.get(content.platform, CONTENT_TEMPLATES["instagram"])
     type_templates = platform_templates.get(content.content_type, platform_templates["post"])
@@ -366,7 +375,7 @@ async def generate_content(content: ContentGenerate, current_user = Depends(lamb
     return {"content": variations[:5]}
 
 @app.get("/api/content")
-async def get_contents(current_user = Depends(lambda: get_current_user)):
+async def get_contents(current_user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     
@@ -377,7 +386,7 @@ async def get_contents(current_user = Depends(lambda: get_current_user)):
     return [dict(c) for c in contents]
 
 @app.post("/api/content")
-async def create_content(content: dict, current_user = Depends(lambda: get_current_user)):
+async def create_content(content: dict, current_user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     
@@ -402,7 +411,7 @@ async def create_content(content: dict, current_user = Depends(lambda: get_curre
 
 # Image endpoints
 @app.post("/api/images/generate")
-async def generate_images(image_req: ImageGenerate, current_user = Depends(lambda: get_current_user)):
+async def generate_images(image_req: ImageGenerate, current_user: dict = Depends(get_current_user)):
     # Generate placeholder images based on style
     images = []
     for i in range(3):
@@ -413,7 +422,7 @@ async def generate_images(image_req: ImageGenerate, current_user = Depends(lambd
 
 # Payment endpoints (Mock M-Pesa)
 @app.post("/api/payments/stk-push")
-async def initiate_stk_push(payment: PaymentRequest, current_user = Depends(lambda: get_current_user)):
+async def initiate_stk_push(payment: PaymentRequest, current_user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     
@@ -443,7 +452,7 @@ async def payment_callback(data: dict):
     return {"success": False, "message": "Payment failed"}
 
 @app.get("/api/subscription")
-async def get_subscription(current_user = Depends(lambda: get_current_user)):
+async def get_subscription(current_user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     
@@ -457,7 +466,7 @@ async def get_subscription(current_user = Depends(lambda: get_current_user)):
     }
 
 @app.post("/api/subscription/activate")
-async def activate_subscription(plan: str, current_user = Depends(lambda: get_current_user)):
+async def activate_subscription(plan: str, current_user: dict = Depends(get_current_user)):
     conn = get_db()
     cursor = conn.cursor()
     

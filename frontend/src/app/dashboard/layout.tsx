@@ -13,10 +13,12 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/store';
+import { API_BASE_URL } from '@/lib/api';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -35,15 +37,64 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, logout } = useAppStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const { user, setUser, logout } = useAppStore();
 
   useEffect(() => {
-    // Check auth on mount
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-    }
-  }, [router]);
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      try {
+        // Fetch user data from API
+        const url = `${API_BASE_URL}/api/auth/me`;
+        const response = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          // Token invalid, redirect to login
+          localStorage.removeItem('token');
+          router.push('/login');
+          return;
+        }
+
+        const userData = await response.json();
+        setUser({
+          id: userData.id.toString(),
+          email: userData.email,
+          name: userData.name,
+          subscription: userData.subscription || 'free'
+        });
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        localStorage.removeItem('token');
+        router.push('/login');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router, setUser]);
+
+  // Show loading while checking auth
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+          <p className="text-text-secondary">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token');
