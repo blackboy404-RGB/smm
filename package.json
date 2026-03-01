@@ -8,8 +8,5 @@
     "frontend:start": "cd frontend && npm run start",
     "backend": "cd backend && python main.py",
     "start": "cd backend && python main.py"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }
