@@ -33,20 +33,11 @@ Frontend runs on: http://localhost:3001
 
 ## ☁️ Deploy to Cloud
 
-### Frontend (Vercel) - FREE
+### Frontend (Netlify) - FREE
 
-1. Push your code to GitHub:
-```
-bash
-git init
-git add .
-git commit -m "Initial commit"
-# Create a new repository on GitHub, then:
-git remote add origin https://github.com/YOUR_USERNAME/socialflow-ai.git
-git push -u origin main
-```
+1. Push your code to GitHub
 
-2. Go to [Vercel.com](https://vercel.com) and sign up
+2. Go to [Netlify.com](https://netlify.com) and sign up
 
 3. Click "Add New..." → "Project"
 
@@ -55,7 +46,7 @@ git push -u origin main
 5. Configure:
    - Framework Preset: Next.js
    - Build Command: `npm run build`
-   - Output Directory: `.next`
+   - Publish Directory: `.next`
 
 6. Click "Deploy"!
 
@@ -84,16 +75,25 @@ git push -u origin main
 ## 📱 Access Your Deployed App
 
 After deployment:
-- **Frontend**: Your Vercel URL (e.g., `https://your-app.vercel.app`)
+- **Frontend**: Your Netlify URL (e.g., `https://your-app.netlify.app`)
 - **Backend API**: Your Railway URL (e.g., `https://your-backend.railway.app`)
 
 ### Update Frontend for Production
 
-1. In your Vercel dashboard, add environment variable:
+1. In your Netlify dashboard, add environment variable:
    - Key: `NEXT_PUBLIC_API_URL`
    - Value: Your Railway backend URL
 
-2. Redeploy to apply changes
+2. Create a `netlify.toml` file in frontend:
+```
+toml
+[[redirects]]
+  from = "/api/*"
+  to = "https://your-backend.railway.app/:splat"
+  status = 200
+```
+
+3. Redeploy to apply changes
 
 ---
 
