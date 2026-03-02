@@ -3,7 +3,10 @@
 const getApiBaseUrl = (): string => {
   // Check if we're in production
   if (process.env.NODE_ENV === 'production') {
-    return process.env.NEXT_PUBLIC_API_URL || 'https://socialflow-ai.up.railway.app';
+    // Priority: NEXT_PUBLIC_API_URL env var > PythonAnywhere > Railway fallback
+    return process.env.NEXT_PUBLIC_API_URL || 
+           'https://yourusername.pythonanywhere.com' ||
+           'https://socialflow-ai.up.railway.app';
   }
   // In development, use relative path (Next.js rewrites handle this)
   return '';
