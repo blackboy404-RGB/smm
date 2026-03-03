@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: socialflow-backend
+    env: python
+    region: oregon
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+    disk:
+      enabled: false
+
+  - type: pserv
+    name: socialflow-db
+    env: postgres
+    plan: free
+    version: "15"
+    region: oregon
