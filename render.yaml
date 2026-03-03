@@ -12,8 +12,8 @@ services:
         generateValue: true
       - key: DEBUG
         value: "false"
-    disk:
-      enabled: false
+    # Database will be auto-linked via DATABASE_URL environment variable
+    # when using Render Blueprint with pserv
 
   - type: pserv
     name: socialflow-db
@@ -21,3 +21,7 @@ services:
     plan: free
     version: "15"
     region: oregon
+    databaseName: socialflow
+    databaseUser: socialflow
+    databasePassword:
+      generateValue: true
