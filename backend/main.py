@@ -1,7 +1,7 @@
 """
 SocialFlow AI - Backend API
 FastAPI application for AI Social Media Manager
-Using SQLite database (no installation required)
+Using PostgreSQL database
 """
 
 from fastapi import FastAPI, HTTPException, Depends, status
@@ -10,12 +10,14 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-import sqlite3
 import random
 import os
 import hashlib
 from dotenv import load_dotenv
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
 
 # Load environment variables from backend/.env
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -33,69 +35,61 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database setup
-DB_PATH = "socialflow.db"
+# Database setup - PostgreSQL
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/socialflow")
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Database models
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False, index=True)
+    phone = Column(String, nullable=False)
+    password = Column(String, nullable=False)
+    subscription = Column(String, default="free")
+    subscription_expiry = Column(String, nullable=True)
+    mpesa_phone = Column(String, nullable=True)
+    created_at = Column(String, nullable=False)
+
+class Brand(Base):
+    __tablename__ = "brands"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    business_name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    industry = Column(String, nullable=True)
+    tone = Column(String, nullable=True)
+    target_audience = Column(Text, nullable=True)
+    brand_colors = Column(String, nullable=True)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False)
+
+class Content(Base):
+    __tablename__ = "contents"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    platform = Column(String, nullable=True)
+    content_type = Column(String, nullable=True)
+    body = Column(Text, nullable=True)
+    image_url = Column(String, nullable=True)
+    scheduled_date = Column(String, nullable=True)
+    status = Column(String, default="draft")
+    created_at = Column(String, nullable=False)
 
 def init_db():
-    """Initialize SQLite database with tables"""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Users table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            phone TEXT NOT NULL,
-            password TEXT NOT NULL,
-            subscription TEXT DEFAULT 'free',
-            subscription_expiry TEXT,
-            mpesa_phone TEXT,
-            created_at TEXT NOT NULL
-        )
-    ''')
-    
-    # Brands table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS brands (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            business_name TEXT NOT NULL,
-            description TEXT,
-            industry TEXT,
-            tone TEXT,
-            target_audience TEXT,
-            brand_colors TEXT,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
-    
-    # Contents table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS contents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            platform TEXT,
-            content_type TEXT,
-            body TEXT,
-            image_url TEXT,
-            scheduled_date TEXT,
-            status TEXT DEFAULT 'draft',
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    """Initialize PostgreSQL database with tables"""
+    Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Initialize database on startup
 init_db()
@@ -161,7 +155,7 @@ def create_access_token(data: dict):
 # Security - Bearer token
 security = HTTPBearer(auto_error=False)
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     if credentials is None:
         raise HTTPException(status_code=401, detail="Authorization header missing")
     
@@ -175,11 +169,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-    user = cursor.fetchone()
-    conn.close()
+    user = db.query(User).filter(User.email == email).first()
     
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
@@ -243,14 +233,10 @@ IMAGE_STYLES = {
 
 # Auth endpoints
 @app.post("/api/auth/register", response_model=Token)
-async def register(user: UserCreate):
-    conn = get_db()
-    cursor = conn.cursor()
-    
+async def register(user: UserCreate, db: Session = Depends(get_db)):
     # Check if user exists
-    cursor.execute("SELECT id FROM users WHERE email = ?", (user.email,))
-    if cursor.fetchone():
-        conn.close()
+    existing_user = db.query(User).filter(User.email == user.email).first()
+    if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
     # Hash password
@@ -258,33 +244,32 @@ async def register(user: UserCreate):
     
     # Create user
     created_at = datetime.utcnow().isoformat()
-    cursor.execute(
-        """INSERT INTO users (name, email, phone, password, subscription, created_at) 
-           VALUES (?, ?, ?, ?, 'free', ?)""",
-        (user.name, user.email, user.phone, hashed_password, created_at)
+    db_user = User(
+        name=user.name,
+        email=user.email,
+        phone=user.phone,
+        password=hashed_password,
+        subscription="free",
+        created_at=created_at
     )
-    conn.commit()
-    conn.close()
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
     
     # Create token
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/api/auth/login", response_model=Token)
-async def login(user: UserLogin):
-    conn = get_db()
-    cursor = conn.cursor()
-    
+async def login(user: UserLogin, db: Session = Depends(get_db)):
     # Find user
-    cursor.execute("SELECT * FROM users WHERE email = ?", (user.email,))
-    db_user = cursor.fetchone()
-    conn.close()
+    db_user = db.query(User).filter(User.email == user.email).first()
     
     if not db_user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Verify password
-    if not verify_password(user.password, db_user["password"]):
+    if not verify_password(user.password, db_user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     # Create token
@@ -292,72 +277,71 @@ async def login(user: UserLogin):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/api/auth/me")
-async def get_me(current_user: dict = Depends(get_current_user)):
+async def get_me(current_user: User = Depends(get_current_user)):
     return {
-        "id": current_user["id"],
-        "name": current_user["name"],
-        "email": current_user["email"],
-        "subscription": current_user["subscription"],
+        "id": current_user.id,
+        "name": current_user.name,
+        "email": current_user.email,
+        "subscription": current_user.subscription,
     }
 
 # Brand endpoints
 @app.post("/api/brand")
-async def create_brand(brand: BrandProfile, current_user: dict = Depends(get_current_user)):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    brand_data = brand.dict()
-    brand_data["user_id"] = current_user["id"]
+async def create_brand(brand: BrandProfile, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     now = datetime.utcnow().isoformat()
-    brand_data["created_at"] = now
-    brand_data["updated_at"] = now
-    brand_data["brand_colors"] = ",".join(brand.brand_colors)
+    brand_colors = ",".join(brand.brand_colors)
     
     # Check if brand exists
-    cursor.execute("SELECT id FROM brands WHERE user_id = ?", (current_user["id"],))
-    existing = cursor.fetchone()
+    existing_brand = db.query(Brand).filter(Brand.user_id == current_user.id).first()
     
-    if existing:
-        cursor.execute("""
-            UPDATE brands SET 
-                business_name=?, description=?, industry=?, tone=?,
-                target_audience=?, brand_colors=?, updated_at=?
-            WHERE user_id=?
-        """, (
-            brand.business_name, brand.description, brand.industry, brand.tone,
-            brand.target_audience, brand.brand_colors, now, current_user["id"]
-        ))
+    if existing_brand:
+        existing_brand.business_name = brand.business_name
+        existing_brand.description = brand.description
+        existing_brand.industry = brand.industry
+        existing_brand.tone = brand.tone
+        existing_brand.target_audience = brand.target_audience
+        existing_brand.brand_colors = brand_colors
+        existing_brand.updated_at = now
     else:
-        cursor.execute("""
-            INSERT INTO brands (user_id, business_name, description, industry, tone, 
-                               target_audience, brand_colors, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            current_user["id"], brand.business_name, brand.description, brand.industry,
-            brand.tone, brand.target_audience, brand.brand_colors, now, now
-        ))
+        new_brand = Brand(
+            user_id=current_user.id,
+            business_name=brand.business_name,
+            description=brand.description,
+            industry=brand.industry,
+            tone=brand.tone,
+            target_audience=brand.target_audience,
+            brand_colors=brand_colors,
+            created_at=now,
+            updated_at=now
+        )
+        db.add(new_brand)
     
-    conn.commit()
-    conn.close()
+    db.commit()
     
     return {"success": True, "message": "Brand profile saved"}
 
 @app.get("/api/brand")
-async def get_brand(current_user: dict = Depends(get_current_user)):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT * FROM brands WHERE user_id = ?", (current_user["id"],))
-    brand = cursor.fetchone()
-    conn.close()
+async def get_brand(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    brand = db.query(Brand).filter(Brand.user_id == current_user.id).first()
     
     if brand:
-        return dict(brand)
+        return {
+            "id": brand.id,
+            "user_id": brand.user_id,
+            "business_name": brand.business_name,
+            "description": brand.description,
+            "industry": brand.industry,
+            "tone": brand.tone,
+            "target_audience": brand.target_audience,
+            "brand_colors": brand.brand_colors,
+            "created_at": brand.created_at,
+            "updated_at": brand.updated_at,
+        }
     return None
 
 # Content endpoints
 @app.post("/api/content/generate")
-async def generate_content(content: ContentGenerate, current_user: dict = Depends(get_current_user)):
+async def generate_content(content: ContentGenerate, current_user: User = Depends(get_current_user)):
     # Get templates
     platform_templates = CONTENT_TEMPLATES.get(content.platform, CONTENT_TEMPLATES["instagram"])
     type_templates = platform_templates.get(content.content_type, platform_templates["post"])
@@ -375,43 +359,47 @@ async def generate_content(content: ContentGenerate, current_user: dict = Depend
     return {"content": variations[:5]}
 
 @app.get("/api/content")
-async def get_contents(current_user: dict = Depends(get_current_user)):
-    conn = get_db()
-    cursor = conn.cursor()
+async def get_contents(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    contents = db.query(Content).filter(Content.user_id == current_user.id).order_by(Content.created_at.desc()).all()
     
-    cursor.execute("SELECT * FROM contents WHERE user_id = ? ORDER BY created_at DESC", (current_user["id"],))
-    contents = cursor.fetchall()
-    conn.close()
-    
-    return [dict(c) for c in contents]
+    return [
+        {
+            "id": c.id,
+            "user_id": c.user_id,
+            "platform": c.platform,
+            "content_type": c.content_type,
+            "body": c.body,
+            "image_url": c.image_url,
+            "scheduled_date": c.scheduled_date,
+            "status": c.status,
+            "created_at": c.created_at,
+        }
+        for c in contents
+    ]
 
 @app.post("/api/content")
-async def create_content(content: dict, current_user: dict = Depends(get_current_user)):
-    conn = get_db()
-    cursor = conn.cursor()
+async def create_content(content: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    created_at = datetime.utcnow().isoformat()
     
-    content["user_id"] = current_user["id"]
-    content["created_at"] = datetime.utcnow().isoformat()
+    new_content = Content(
+        user_id=current_user.id,
+        platform=content.get("platform"),
+        content_type=content.get("content_type"),
+        body=content.get("body"),
+        image_url=content.get("image_url"),
+        scheduled_date=content.get("scheduled_date"),
+        status=content.get("status", "draft"),
+        created_at=created_at
+    )
+    db.add(new_content)
+    db.commit()
+    db.refresh(new_content)
     
-    cursor.execute("""
-        INSERT INTO contents (user_id, platform, content_type, body, image_url, 
-                           scheduled_date, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        content["user_id"], content.get("platform"), content.get("content_type"),
-        content.get("body"), content.get("image_url"), content.get("scheduled_date"),
-        content.get("status", "draft"), content["created_at"]
-    ))
-    
-    content_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
-    return {"id": content_id, "success": True}
+    return {"id": new_content.id, "success": True}
 
 # Image endpoints
 @app.post("/api/images/generate")
-async def generate_images(image_req: ImageGenerate, current_user: dict = Depends(get_current_user)):
+async def generate_images(image_req: ImageGenerate, current_user: User = Depends(get_current_user)):
     # Generate placeholder images based on style
     images = []
     for i in range(3):
@@ -422,17 +410,10 @@ async def generate_images(image_req: ImageGenerate, current_user: dict = Depends
 
 # Payment endpoints (Mock M-Pesa)
 @app.post("/api/payments/stk-push")
-async def initiate_stk_push(payment: PaymentRequest, current_user: dict = Depends(get_current_user)):
-    conn = get_db()
-    cursor = conn.cursor()
-    
+async def initiate_stk_push(payment: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Update user's M-Pesa phone
-    cursor.execute(
-        "UPDATE users SET mpesa_phone = ? WHERE id = ?",
-        (payment.phone, current_user["id"])
-    )
-    conn.commit()
-    conn.close()
+    current_user.mpesa_phone = payment.phone
+    db.commit()
     
     # Simulate STK push response
     return {
@@ -452,32 +433,19 @@ async def payment_callback(data: dict):
     return {"success": False, "message": "Payment failed"}
 
 @app.get("/api/subscription")
-async def get_subscription(current_user: dict = Depends(get_current_user)):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT subscription, subscription_expiry FROM users WHERE id = ?", (current_user["id"],))
-    user = cursor.fetchone()
-    conn.close()
-    
+async def get_subscription(current_user: User = Depends(get_current_user)):
     return {
-        "plan": user["subscription"] if user else "free",
-        "expiry": user["subscription_expiry"] if user else None,
+        "plan": current_user.subscription,
+        "expiry": current_user.subscription_expiry,
     }
 
 @app.post("/api/subscription/activate")
-async def activate_subscription(plan: str, current_user: dict = Depends(get_current_user)):
-    conn = get_db()
-    cursor = conn.cursor()
-    
+async def activate_subscription(plan: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     expiry = (datetime.utcnow() + timedelta(days=30)).isoformat()
     
-    cursor.execute(
-        "UPDATE users SET subscription = ?, subscription_expiry = ? WHERE id = ?",
-        (plan, expiry, current_user["id"])
-    )
-    conn.commit()
-    conn.close()
+    current_user.subscription = plan
+    current_user.subscription_expiry = expiry
+    db.commit()
     
     return {"success": True, "plan": plan, "expiry": expiry}
 

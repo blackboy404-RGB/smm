@@ -10,6 +10,14 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
+        # PostgreSQL connection string - Render will auto-provision if not set
+        # Format: postgresql://user:password@host:port/database
         value: ""
       - key: DEBUG
         value: "false"
+
+  - type: pserv
+    name: socialflow-db
+    env: postgres
+    plan: free
+    version: "15"

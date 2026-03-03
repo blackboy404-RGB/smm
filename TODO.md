@@ -1,53 +1,26 @@
-# TODO - Remove Unnecessary Files
+# TODO - Project Tasks
 
-## ✅ Completed:
-- [x] backend/main_fixed.py (removed)
-- [x] backend/main_fixed2.py (removed)
-- [x] nixpacks.toml (removed - duplicate at root)
-- [x] render.yaml (removed - duplicate at root)
-- [x] package.json (removed - duplicate at root)
-- [x] fly.zip (removed)
-- [x] railway.json (removed)
+## Completed:
+- [x] Remove unnecessary files: duplicates and unused configs
+- [x] Update backend to use PostgreSQL instead of SQLite
+- [x] Add psycopg2-binary and sqlalchemy to requirements.txt
+- [x] Update main.py with SQLAlchemy models for PostgreSQL
+- [x] Update render.yaml with PostgreSQL service
 
-## Remaining (in .gitignore but optional to remove):
-- [ ] .venv-1/ (likely already removed)
-- [ ] socialflow.db (dev database)
-- [ ] .next/ (build output - in frontend/)
-- [ ] node_modules/ (dependencies - in frontend/)
+## Backend Deployment (PostgreSQL):
+1. Go to https://dashboard.render.com
+2. Click "New +" → "Blueprint"
+3. Select repository: blackboy404-RGB/smm
+4. Select branch: blackboxai/fix-backend-requirements
+5. Render will detect backend/render.yaml and create:
+   - socialflow-backend (web service)
+   - socialflow-db (PostgreSQL database)
+6. Click "Apply" to deploy
 
-## Project Structure After Cleanup:
-```
-smm-app/
-├── .git/
-├── .venv/
-├── backend/
-│   ├── .env
-│   ├── .env.example
-│   ├── main.py
-│   ├── Procfile
-│   ├── render.yaml
-│   ├── requirements.txt
-│   ├── runtime.txt
-│   ├── socialflow.db
-│   └── wsgi.py
-├── frontend/
-│   ├── .env.example
-│   ├── .env.production
-│   ├── .eslintrc.json
-│   ├── netlify.toml
-│   ├── next-env.d.ts
-│   ├── next.config.js
-│   ├── package.json
-│   ├── package-lock.json
-│   ├── postcss.config.js
-│   ├── tailwind.config.js
-│   ├── tsconfig.json
-│   ├── vercel.json
-│   ├── .next/
-│   ├── node_modules/
-│   └── src/
-├── .gitignore
-├── README.md
-├── socialflow.db
-├── SPEC.md
-└── TODO.md
+## Environment Variables:
+After deployment, Render will provide:
+- DATABASE_URL (auto-set for PostgreSQL)
+- SECRET_KEY (auto-generated)
+
+## Frontend:
+Update frontend/src/lib/api.ts to point to your deployed backend URL after deployment.
