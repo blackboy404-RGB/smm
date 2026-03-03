@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Sparkles, Copy, RefreshCw, Check, Instagram, Twitter, Linkedin, Facebook, Loader2 } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/api';
 
 const platforms = [
   { id: 'instagram', name: 'Instagram', icon: Instagram, color: 'text-pink-500' },
@@ -42,7 +43,8 @@ export default function GeneratePage() {
     setGeneratedContent([]);
 
     try {
-      const response = await fetch('/api/content/generate', {
+      const url = `${API_BASE_URL}/api/content/generate`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
