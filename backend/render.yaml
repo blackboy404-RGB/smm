@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: socialflow-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        # PostgreSQL connection string - Render will auto-provision if not set
+        # Format: postgresql://user:password@host:port/database
+        value: ""
+      - key: DEBUG
+        value: "false"
+
+  - type: pserv
+    name: socialflow-db
+    env: postgres
+    plan: free
+    version: "15"
